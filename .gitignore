@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+
+# data, MedDINOv3 code/weights and training outputs are not tracked
+data/
+MedDINOv3/
+results/
+*.pt
+*.pth
