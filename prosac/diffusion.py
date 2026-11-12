@@ -8,6 +8,7 @@ Stage-dependent loss (all stages use (lambda_r, lambda_eps, lambda_x) = (1, 1, 0
 Deterministic residual sampler between selected steps t > t':
     x_t' = x_t - (A_t - A_t') r_hat - (B_t - B_t') eps_hat
 With 10 sampling steps the network is evaluated at t = 999, 899, ..., 99 and the last x0_hat is returned.
+残差扩散：中心 LDCT 与 NDCT 的差作为残差，网络同时预测残差和噪声；推理用确定性的残差采样器。
 """
 import math
 import random
@@ -40,9 +41,11 @@ class ResidualDiffusion(nn.Module):
         self.register_buffer('betas_cumsum', torch.sqrt(betas2_cumsum).to(torch.float32))  # B_t
 
     def q_sample(self, x0, x_res, t, noise):
+        # 前向过程：x_t = x0 + A_t * r + B_t * noise
         return x0 + extract(self.alphas_cumsum, t, x0.shape) * x_res + extract(self.betas_cumsum, t, x0.shape) * noise
 
     def predict_x0(self, x_t, t, pred_res, pred_noise):
+        # 由预测的残差和噪声恢复 NDCT：x0_hat = x_t - A_t * r_hat - B_t * eps_hat
         return x_t - extract(self.alphas_cumsum, t, x_t.shape) * pred_res - extract(self.betas_cumsum, t, x_t.shape) * pred_noise
 
     # ----------------------------------------------------------------------------- sampling
@@ -57,7 +60,7 @@ class ResidualDiffusion(nn.Module):
 
         times = torch.linspace(-1, self.num_timesteps - 1, steps=self.sampling_timesteps + 1)
         times = list(reversed(times.int().tolist()))
-        img = y_c + math.sqrt(self.sum_scale) * torch.randn_like(y_c)
+        img = y_c + math.sqrt(self.sum_scale) * torch.randn_like(y_c)  # 从加少量噪声的中心 LDCT 出发
         for time, time_next in tqdm(list(zip(times[:-1], times[1:])), desc='sampling', leave=False):
             t = torch.full((img.shape[0],), time, device=img.device, dtype=torch.long)
             pred_res, pred_noise = self.model(torch.cat((img, y_adj), dim=1), t, prior)
@@ -71,7 +74,11 @@ class ResidualDiffusion(nn.Module):
 
     # ----------------------------------------------------------------------------- training
     def sample_stage_timesteps(self, batch_size, device):
-        """One stage per mini-batch, then a uniform time step inside that stage for every sample."""
+        """With TD3: one stage per mini-batch, then a uniform time step inside that stage for every sample.
+        TD3 开启时一个 batch 只训练一个阶段的分支；关闭时在全部时间步上均匀采样。
+        """
+        if not self.model.use_td3:
+            return torch.randint(0, self.num_timesteps, (batch_size,), device=device)
         lo, hi = STAGE_RANGES[random.randint(0, NUM_STAGES - 1)]
         return torch.randint(lo, hi + 1, (batch_size,), device=device)
 
@@ -88,5 +95,6 @@ class ResidualDiffusion(nn.Module):
 
         pred_res, pred_noise = self.model(torch.cat((x_t, y_adj), dim=1), t, prior)
         x0_hat = self.predict_x0(x_t, t, pred_res, pred_noise)
+        # 分阶段损失：残差、噪声、重建 NDCT 三项 L2，权重 (1, 1, 0.1)
         return (self.lambda_r * F.mse_loss(pred_res, x_res) + self.lambda_eps * F.mse_loss(pred_noise, noise)
                 + self.lambda_x * F.mse_loss(x0_hat, x0))

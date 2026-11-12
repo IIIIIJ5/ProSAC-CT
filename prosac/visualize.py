@@ -1,4 +1,6 @@
-"""Conversion to 8-bit images and side-by-side result panels."""
+"""Conversion to 8-bit images and side-by-side result panels.
+可视化：转为 8 位图像，并保存 [输入 | 输出 | 参考] 对比图。
+"""
 import os
 
 import cv2

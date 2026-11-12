@@ -1,4 +1,5 @@
-"""Res2NeXt-style residual block used in the shallow encoder/decoder stages.
+"""Res2NeXt-style residual block used in the two shallow encoder levels and the two deep decoder levels.
+Res2NeXt 残差块：第二个卷积换成多尺度分组分支，用在编码器浅层和解码器深层。
 
 Same interface as the time-conditioned ResnetBlock; only the second convolution is replaced by a
 multi-scale Res2Net branch with grouped (ResNeXt) convolutions and a gated merge.

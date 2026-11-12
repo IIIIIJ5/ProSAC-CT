@@ -1,4 +1,6 @@
-"""Training loop with EMA, periodic evaluation (PSNR / SSIM) and checkpointing."""
+"""Training loop with EMA, periodic evaluation (PSNR / SSIM) and checkpointing.
+训练循环：EMA 权重、定期在测试集上评估、保存与恢复 checkpoint。
+"""
 from pathlib import Path
 
 import numpy as np
@@ -38,6 +40,7 @@ class Trainer:
 
         self.opt = Adam(diffusion.parameters(), lr=lr, betas=adam_betas)
         if self.accelerator.is_main_process:
+            # 评估和测试都使用 EMA 权重
             self.ema = EMA(diffusion, beta=ema_decay, update_every=ema_update_every)
             self.results_folder = Path(results_folder)
             self.results_folder.mkdir(parents=True, exist_ok=True)
@@ -61,7 +64,7 @@ class Trainer:
         print(f'saved checkpoint: {path}')
 
     def load(self, path, load_optimizer=True):
-        data = torch.load(str(path), map_location=self.device)
+        data = torch.load(str(path), map_location=self.device, weights_only=True)  # 只加载张量与基本类型
         self.accelerator.unwrap_model(self.model).load_state_dict(data['model'])
         self.ema.load_state_dict(data['ema'])
         self.ema.to(self.device)
@@ -78,7 +81,7 @@ class Trainer:
         with tqdm(initial=self.step, total=self.num_steps, disable=not accelerator.is_main_process) as pbar:
             while self.step < self.num_steps:
                 total_loss = 0.
-                for _ in range(self.gradient_accumulate_every):
+                for _ in range(self.gradient_accumulate_every):  # 梯度累积
                     ndct, ldct, ldct_adj, _ = next(self.dl)
                     with accelerator.autocast():
                         loss = self.model(ndct.to(self.device), ldct.to(self.device), ldct_adj.to(self.device))
@@ -122,6 +125,7 @@ class Trainer:
         for ndct, ldct, ldct_adj, names in tqdm(loader, desc='evaluating'):
             output = model.sample(ldct.to(self.device), ldct_adj.to(self.device))
             for i, name in enumerate(names):
+                # 在 8 位图像上计算 PSNR / SSIM
                 out_img, ndct_img, ldct_img = to_uint8(output[i]), to_uint8(ndct[i]), to_uint8(ldct[i])
                 psnr, ssim = calculate_psnr(out_img, ndct_img), calculate_ssim(out_img, ndct_img)
                 psnrs.append(psnr)

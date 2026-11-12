@@ -55,14 +55,23 @@ Here `split` is `train` or `test`. At the first or last slice of a volume, repea
 
 **Train / test**
 
+All settings live in `config.py`, including the module switches. `train.py` and `test.py` both read them, so a test always uses the architecture the model was trained with. Set a switch to `False` for the corresponding ablation:
+
+```python
+use_apgc = True    # APGC: anatomical prior from the centre LDCT slice, injected into the shared encoder
+use_rfdds = True   # RFDDS: per-stage frequency decoupling on the shared latent representation
+use_td3 = True     # TD3: one decoder per time-step stage (False: one decoder for all time steps)
+```
+
 ```bash
-python train.py --data_dir data/lists --results_dir results/prosac_ct
+python train.py --data_dir data/lists
 python test.py  --data_dir data/lists --checkpoint results/prosac_ct/model-100000.pt --save_dir results/test
 ```
 
-Training defaults: Adam with learning rate 2e-4, batch size 4, 100k iterations and EMA 0.995. Inference evaluates the network at t = 999, 899, …, 99 and returns the final NDCT estimate. `test.py` reports PSNR / SSIM and saves the denoised slices. `--no_apgc` gives the ablation without the anatomical prior.
+Training defaults: Adam with learning rate 2e-4, batch size 4, 100k iterations and EMA 0.995. Inference evaluates the network at t = 999, 899, …, 99 and returns the final NDCT estimate. `test.py` reports PSNR / SSIM and saves the denoised slices.
 
 ```
+config.py            # module switches and hyperparameters
 prosac/
 ├── unet.py          # shared encoder with APGC, RFDDS, TD3 decoders
 ├── diffusion.py     # residual diffusion, stage-wise training loss, deterministic sampler
@@ -115,4 +124,7 @@ ProSAC-CT 把低剂量 CT（LDCT）去噪建模为残差扩散过程，条件是
 1. 安装依赖：`pip install -r requirements.txt`。
 2. 按上文 *MedDINOv3* 一段准备代码和权重。
 3. 准备数据：CT 先截断到 [-160, 240] HU，再归一化到 [0, 1]，存成 8 位灰度图。在 `data_dir` 下放八个列表文件，即上表中的 `ndct`、`ldct`、`ldct_prev`、`ldct_next`，训练和测试各一套，各列表按行对应。卷首、卷尾缺少的相邻切片用中心切片代替。
-4. 训练和测试的命令同上。默认用 Adam，学习率 2e-4，batch size 4；推理在 t = 999, 899, …, 99 处评估。`--no_apgc` 用于消融实验。
+4. 所有设置都在 `config.py` 中，train.py 和 test.py 共用。
+   - 模块开关为 `use_apgc`、`use_rfdds`、`use_td3`，设为 `False` 即对应的消融实验。
+   - 默认设置：Adam，学习率 2e-4，batch size 4；推理在 t = 999, 899, …, 99 处评估。
+5. 训练和测试的命令同上。

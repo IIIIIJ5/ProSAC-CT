@@ -6,6 +6,7 @@ The prior is computed from the centre LDCT slice y_c only:
     F_AEFM = (alpha * F_AFM) * (gamma * F_EFM)    alpha, gamma: learnable channel-wise weights
 All maps are brought to the fusion resolution and C channels by convolutional projections.
 The result does not depend on the time step, so it is computed once per slice and reused at every reverse step.
+解剖先验引导：只由中心 LDCT 切片计算，与时间步无关，因此推理时只算一次、各步复用。
 """
 import torch
 import torch.nn.functional as F
@@ -42,5 +43,5 @@ class APGC(nn.Module):
         """y_c: centre LDCT slice in [0, 1], (B, 1, H, W) -> F_AEFM, (B, dim, H, W)."""
         afm = self.afm_proj(self.anatomy_encoder(y_c))
         sobel, lap = sobel_laplacian_maps(y_c)
-        efm = self.sobel_proj(sobel) + self.laplacian_proj(lap)
+        efm = self.sobel_proj(sobel) + self.laplacian_proj(lap)  # Sobel 抓主要轮廓，Laplacian 补充细边界
         return (self.alpha * afm) * (self.gamma * efm)

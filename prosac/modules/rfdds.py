@@ -6,6 +6,7 @@
     F_hat = F_SLR + eta * sum_b w_b * F_b
 
 M_b are radial masks on the centred spectrum with cut-offs r1 and r2 of the normalised radius.
+残差频域解耦层：把特征分成低/中/高三个径向频段，由频段自身估计通道级权重，加权后以残差方式加回。
 """
 import torch
 import torch.nn.functional as F
@@ -37,6 +38,7 @@ class RFDDL(nn.Module):
 
     def forward(self, x):
         bands = self.decouple(x)
+        # 每个频段经 DBR 后全局平均池化，得到通道描述子；在三个频段之间做 softmax
         z = torch.stack([dbr(band).mean(dim=(2, 3)) for dbr, band in zip(self.dbr, bands)], dim=1)  # (B, 3, C)
         w = F.softmax(z, dim=1)
         response = sum(w[:, b, :, None, None] * bands[b] for b in range(3))

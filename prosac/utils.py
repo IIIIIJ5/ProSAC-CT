@@ -1,4 +1,6 @@
-"""Small helpers shared by the model, the diffusion process and the trainer."""
+"""Small helpers shared by the model, the diffusion process and the trainer.
+通用小工具：随机种子、归一化、按时间步取系数、残差扩散的系数表等。
+"""
 import math
 import random
 

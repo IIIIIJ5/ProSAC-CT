@@ -1,4 +1,6 @@
-"""U-Net building blocks (adapted from lucidrains/denoising-diffusion-pytorch, MIT License)."""
+"""U-Net building blocks (adapted from lucidrains/denoising-diffusion-pytorch, MIT License).
+U-Net 基础模块：残差块（带时间步调制）、线性注意力、上下采样等。
+"""
 import math
 from functools import partial
 

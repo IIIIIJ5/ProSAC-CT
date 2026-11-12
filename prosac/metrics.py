@@ -1,4 +1,6 @@
-"""PSNR / SSIM on 8-bit images (same definitions as BasicSR)."""
+"""PSNR / SSIM on 8-bit images (same definitions as BasicSR).
+评价指标：在 0-255 的 8 位图像上计算 PSNR 与 SSIM。
+"""
 import cv2
 import numpy as np
 
